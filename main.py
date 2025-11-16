@@ -59,9 +59,9 @@ def register_att():
     ALL_ATTENTION_FUNCTIONS["att_dsa_dynamic"] = partial(att_layer,att_dsa_dynamic)
 
 def layer2att(layer_idx):
-    if layer_idx<=5:
+    if layer_idx<=6:
         return None
-    elif layer_idx>23:
+    elif layer_idx>27:
         return "att_dsa_static"
     else:
         return "att_sink"
@@ -73,7 +73,7 @@ if __name__ == "__main__":
     register_att()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     tokenizer = AutoTokenizer.from_pretrained(args.model, trust_remote_code=True)
-    model = AutoModelForCausalLM.from_pretrained(args.model, trust_remote_code=True,attn_implementation="att_sink")
+    model = AutoModelForCausalLM.from_pretrained(args.model, trust_remote_code=True,attn_implementation="flash_attention_2")
     layers = model.model.layers
     # for layer_idx, layer in enumerate(layers):
     #     # if layer_idx<=5:
