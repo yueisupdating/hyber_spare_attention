@@ -157,4 +157,3 @@ def att_dsa_dynamic(
         out = torch.einsum("hxy,yhd->xhd", p, v_)
         o[b_start:b_end] = out.to(q.dtype)
     return o
-
