@@ -13,7 +13,7 @@ def att_full(
     max_seqlen: int
     ):
     bs=cu_seqlens.numel()-1
-    d_k=torch.rsqrt(q.shape[-1])
+    d_k=torch.rsqrt(torch.tensor(q.shape[-1]))
     o = torch.zeros_like(q)
     for b in range(bs):
         b_start=cu_seqlens[b].item()
@@ -36,7 +36,7 @@ def att_sink(q: torch.Tensor,
     cu_seqlens: torch.Tensor,
     max_seqlen: int):
     bs=cu_seqlens.numel()-1
-    d_k=torch.rsqrt(q.shape[-1])
+    d_k=torch.rsqrt(torch.tensor(q.shape[-1]))
     o = torch.zeros_like(q)
     for b in range(bs):
         b_start=cu_seqlens[b].item()
