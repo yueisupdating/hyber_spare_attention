@@ -3,7 +3,7 @@ import torch
 block_size = 32
 sink_num = 4
 local_blocks = 2
-topk_num_static = 64
+topk_num = 3
 
 def att_full(
     q: torch.Tensor,
@@ -83,7 +83,7 @@ def att_dsa_static(
             key_block.append(k_[block_start:block_end].mean(dim=0))
         key_block=torch.cat(key_block,dim=0).to(torch.float32) #(num_block,h,d)
         qk_gate = torch.einsum("xhd,yhd->hxy", q_, key_block) #(h,s,num_block)
-        topk_val,topk_idx = torch.topk(qk_gate,k=min(topk_num_static,num_block),dim=-1, largest=True, sorted=False)
+        topk_val,topk_idx = torch.topk(qk_gate,k=min(topk_num,num_block),dim=-1, largest=True, sorted=False)
         mask = torch.zeros_like(qk_gate, dtype=torch.bool)
         # 为每个query位置设置对应的block mask
         for i in range(seq_len):
@@ -140,7 +140,7 @@ def att_dsa_dynamic(
         # 计算query的压缩表示
         q_d = torch.einsum("shd,dhD->shD", q_, W_q_d)  # (seq_len, h, d_d)
         qk_d = torch.einsum("xhD,yhD->hxy", q_d, key_block_lora)  # (h, seq_len, num_block)
-        _, topk_idx = torch.topk(qk_d, k=min(topk_num_static, num_block), dim=-1, largest=True, sorted=False)
+        _, topk_idx = torch.topk(qk_d, k=min(topk_num, num_block), dim=-1, largest=True, sorted=False)
         
         mask = torch.zeros((qk_d.shape[0], seq_len, num_block), dtype=torch.bool, device=qk_d.device)
         for i in range(seq_len):

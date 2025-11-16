@@ -33,14 +33,13 @@ if __name__ == "__main__":
         att_fn_name = layer2att(layer_idx)
         print(f"层 {layer_idx}: 使用attention函数 {att_fn_name}")
         if hasattr(layer.self_attn, 'attn_fn'):
-            print(1)
+            print('\nygx1')
             layer.self_attn.attn_fn = ALL_ATTENTION_FUNCTIONS[att_fn_name]
         elif hasattr(layer.self_attn, 'attention_fn'):
-            print(2)
+            print('\nygx2')
             layer.self_attn.attention_fn = ALL_ATTENTION_FUNCTIONS[att_fn_name]
 
     inputs = tokenizer.encode("how are you?")
     input_ids = torch.tensor([inputs], device=model.device)
     tokens = model.generate(input_ids, max_length=200, do_sample=False)
-    print(tokens)
     print(tokenizer.decode(tokens.squeeze().tolist()))
