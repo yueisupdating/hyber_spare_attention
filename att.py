@@ -1,6 +1,7 @@
 import torch
 from torch import nn
 import torch.nn.functional as F
+from flash_attn import flash_attn_func
 
 import math
 from dataclasses import dataclass
@@ -65,7 +66,7 @@ def repeat_kv(x: torch.Tensor, n_rep: int) -> torch.Tensor:
 
 
 class Attention(nn.Module):
-    def __init__(self, args: ModelArgs):
+    def __init__(self, args: ModelArgs,layer_idx: int):
         super().__init__()
         self.n_kv_heads = args.n_heads if args.n_kv_heads is None else args.n_kv_heads
         model_parallel_size = fs_init.get_model_parallel_world_size()
@@ -73,7 +74,7 @@ class Attention(nn.Module):
         self.n_local_kv_heads = self.n_kv_heads // model_parallel_size
         self.n_rep = self.n_local_heads // self.n_local_kv_heads
         self.head_dim = args.dim // args.n_heads
-
+        self.layer_idx = layer_idx
         self.wq = ColumnParallelLinear(
             args.dim,
             args.n_heads * self.head_dim,
@@ -193,7 +194,6 @@ class Attention(nn.Module):
         x: torch.Tensor,
         start_pos: int,
         freqs_cis: torch.Tensor,
-        layer_idx: int,
         mask: Optional[torch.Tensor],
     ):
         bsz, seqlen, _ = x.shape
@@ -221,17 +221,21 @@ class Attention(nn.Module):
         values = repeat_kv(
             values, self.n_rep
         )  # (bs, cache_len + seqlen, n_local_heads, head_dim)
+        if keys.shape[1]==seqlen:
 
-        mask=self.layer2mask(layer_idx,xq,keys,values) # bs s h d
-        scores =  torch.einsum("bxhd,byhd->bhxy", xq, keys)/ math.sqrt(self.head_dim) 
-        # scores: bs,h,seqlen,cache_len+seqlen
-        # values:bs,cache_len+seqlen,h,d
-        if mask is not None:
-            scores[~mask] = float("-inf")  # (bs, n_local_heads, seqlen, cache_len + seqlen)
-        scores = F.softmax(scores.float(), dim=-1).type_as(xq)
-        output = torch.einsum("bhxy,byhd->bxhd", scores, values)  # (bs, seqlen,n_local_heads,head_dim)
-        output = output.contiguous().view(bsz, seqlen, -1)
-        return self.wo(output)
-
+            mask=self.layer2mask(self.layer_idx,xq,keys,values) # bs s h d
+            scores =  torch.einsum("bxhd,byhd->bhxy", xq, keys)/ math.sqrt(self.head_dim) 
+            # scores: bs,h,seqlen,cache_len+seqlen
+            # values:bs,cache_len+seqlen,h,d
+            if mask is not None:
+                scores[~mask] = float("-inf")  # (bs, n_local_heads, seqlen, cache_len + seqlen)
+            scores = F.softmax(scores.float(), dim=-1).type_as(xq)
+            output = torch.einsum("bhxy,byhd->bxhd", scores, values)  # (bs, seqlen,n_local_heads,head_dim)
+            output = output.contiguous().view(bsz, seqlen, -1)
+            return self.wo(output)
+        else:
+            dropout=0.0
+            scaling=None
+            return flash_attn_func(xq, keys, values, dropout, scaling, True)
 
 
